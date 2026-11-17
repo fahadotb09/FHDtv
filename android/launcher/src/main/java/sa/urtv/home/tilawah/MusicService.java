@@ -1111,6 +1111,7 @@ public class MusicService extends Service implements AudioManager.OnAudioFocusCh
                 save();
                 updateSession();
                 updateNotification();
+                scheduleResumeIfAlone();   // FHDtv
             }
         } else if (change == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK) {
             if (player != null) player.setVolume(0.2f, 0.2f);
@@ -1125,6 +1126,43 @@ public class MusicService extends Service implements AudioManager.OnAudioFocusCh
                 updateNotification();
             }
         }
+    }
+
+    /**
+     * FHDtv: the TV's own screens (the settings, the screensaver) take the audio focus for a moment and some never give it back, so the
+     * recitation stayed paused until the card was pressed. After a focus loss that paused it, look twice (2 s and 5 s later): when no
+     * other app plays music and no call is on, take the focus back and go on. Another app really playing keeps it paused, as before;
+     * at most 4 such resumes a minute, so two apps fighting for the focus can never loop.
+     */
+    private int autoResumeLooks;
+    private long autoResumeWindow;
+    private int autoResumeCount;
+    private final Runnable resumeIfAlone = new Runnable() {
+        @Override public void run() {
+            if (!resumeOnFocus || player == null || !prepared || playing || audio == null) return;
+            if (source == Prefs.SOURCE_ADHAN || source == Prefs.SOURCE_NONE) return;
+            if (audio.isMusicActive() || audio.getMode() != AudioManager.MODE_NORMAL) {   // someone else is playing, or a call: wait, one more look
+                if (++autoResumeLooks < 2) handler.postDelayed(this, 3000);
+                return;
+            }
+            long now = SystemClock.elapsedRealtime();
+            if (now - autoResumeWindow > 60000) { autoResumeWindow = now; autoResumeCount = 0; }
+            if (autoResumeCount >= 4) return;
+            autoResumeCount++;
+            if (!requestFocus()) return;
+            player.start();
+            playing = true;
+            resumeOnFocus = false;
+            playbackStarted();
+            updateSession();
+            updateNotification();
+        }
+    };
+
+    private void scheduleResumeIfAlone() {
+        autoResumeLooks = 0;
+        handler.removeCallbacks(resumeIfAlone);
+        handler.postDelayed(resumeIfAlone, 2000);
     }
 
     // ---- MediaSession + notification ----
