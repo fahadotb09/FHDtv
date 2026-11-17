@@ -4401,7 +4401,7 @@ function mpGroups(){   // [{key, name, games}] of the chosen day: «فرقك», 
     if(rest.length){ shown.add(k); out.push({key: k, name: fbRound(rest[0]), nameHtml: fbRoundHtml(rest[0]), side: leagueName(rest[0]) || fbRound(rest[0]), games: rest, count: by[k].length}); }
   });
   const more = mpMore(shown);   // ONE section after the person's own rows: the tournaments and the top leagues not already shown
-  if(more.length) out.push({key: 'more', name: FB_W.more, games: more, count: more.length, more: true});
+  if(more.length) out.push({key: 'more', name: MP.day === fbDayAdd(cityToday(Date.now()), -1) ? FB_W.yesterday : FB_W.more, games: more, count: more.length, more: true});
   else if(mpMoreDay() && !MATCHES_LOADED) out.push({key: 'more', name: FB_W.more, games: [], count: 0, more: true, loading: true});   // until a load answers, a line says so
   return out;
 }
@@ -4410,11 +4410,11 @@ const MP_MORE_MAX = 12;
 function mpMoreDay(){
   if(!MP_MORE && !CONFIG.tour) return false;
   const t = cityToday(Date.now());
-  return MP.day === t || MP.day === fbDayAdd(t, 1);
+  return MP.day === fbDayAdd(t, -1) || MP.day === t || MP.day === fbDayAdd(t, 1);   // FHDtv: yesterday too, its tournament results were hidden
 }
 function mpMore(shown){
   if(!mpMoreDay()) return [];
-  const t = cityToday(Date.now()), days = [t, fbDayAdd(t, 1)];
+  const t = cityToday(Date.now()), y = fbDayAdd(t, -1), days = MP.day === y ? [y] : [t, fbDayAdd(t, 1)];   // FHDtv: the yesterday tab shows yesterday's results only
   const rank = ev => { const i = MP_TOP_IDS.indexOf(String(ev.idLeague || '')); return i >= 0 ? i : ev.tour ? 50 : -1; };
   return fbGames().filter(ev => !fbMine(ev) && rank(ev) >= 0 && !shown.has(String(ev.idLeague || ev.strLeague || '')) && days.includes(fbDayOf(fbKick(ev)))).sort((a, b) => (rank(a) - rank(b)) || fbKick(a) - fbKick(b)).slice(0, MP_MORE_MAX);
 }
